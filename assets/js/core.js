@@ -205,7 +205,7 @@ export function buildPayload(db, sid, viewer) {
 // What a student still has to do + dates they have booked. p = payload-like {steps}.
 export function reminderItems(p) {
   const rank = { onboard: 0, visa: 1, departure: 2 };
-  const steps = [...p.steps].sort((a, b) => rank[a.track] - rank[b.track] || a.stage - b.stage || a.sort - b.sort), out = { todo: [], booked: [] };
+  const steps = [...p.steps].sort((a, b) => rank[a.track] - rank[b.track] || a.stage - b.stage || a.sort - b.sort), out = { todo: [], booked: [], todoSteps: [], waiting: [] };
   const vStage = currentStage(steps, 'visa');
   const dOpen = departureUnlocked(steps);
   const t0 = today();
@@ -216,10 +216,11 @@ export function reminderItems(p) {
       const v = s.data?.[f.k]; const d = toDate(v);
       if (d && d >= t0) out.booked.push({ title: s.title, label: f.l, date: v, dt: f.t === 'datetime' });
     });
-    if (s.status === 'pending' || s.optional || s.actor === 'sac' || s.key === 'arrival') return;
+    if (s.status === 'pending') { out.waiting.push(s); return; }
+    if (s.optional || s.actor === 'sac' || s.key === 'arrival') return;
     if (s.track === 'visa' && s.stage > vStage) return;
     if (s.track === 'departure' && !dOpen) return;
-    out.todo.push(s.title);
+    out.todo.push(s.title); out.todoSteps.push(s);
   });
   out.booked.sort((a, b) => toDate(a.date) - toDate(b.date));
   return out;

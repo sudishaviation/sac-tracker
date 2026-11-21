@@ -237,3 +237,18 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .fold summary { cursor: pointer; padding: 10px 12px; font-weight: 600; color: var(--navy); }
 .fold .foldbody { padding: 0 12px 8px; font-size: 13px; }
 .visa-badge { display: inline-block; padding: 2px 8px; border-radius: 99px; background: var(--sky); color: var(--navy); font-size: 11px; font-weight: 700; margin-left: 6px; }
+
+/* "Also to do" list under the Next step card */
+.also { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin: 10px 0; }
+.also h4 { margin: 0 0 6px; color: var(--navy); font-size: 14px; }
+.also ul { list-style: none; margin: 0; padding: 0; }
+.also li { display: flex; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 14px; align-items: flex-start; }
+.also li:first-child { border-top: 0; }
+.also li small { display: block; color: var(--muted, #667085); font-size: 12px; }
+.also li.bk b { color: var(--navy); } .also li.wt { color: #667085; }
+.also .linkish { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; text-decoration: underline dotted; }
+.also .btn { margin-top: 8px; }
+
+.also .also-toggle { display: flex; width: 100%; justify-content: space-between; align-items: center; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--sky); color: var(--navy); font: inherit; font-weight: 600; cursor: pointer; }
+.also .also-toggle .chev { font-style: normal; font-size: 20px; line-height: 1; transition: transform .2s; }
+.also .also-toggle.open .chev { transform: rotate(180deg); }

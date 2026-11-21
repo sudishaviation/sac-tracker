@@ -2,7 +2,7 @@
 import {
   STAGES, STATUS_LABEL, DOCTOR_GROUPS, esc, h, $, $$, money, fmtDate, fmtDateTime, isComplete, byKey,
   trackSteps, currentStage, stageDone, departureUnlocked, expectation, studentCanEdit, nextAction,
-  badges, feeRows, studentWarnings, toast, copy, parentLink,
+  badges, feeRows, studentWarnings, toast, copy, parentLink, reminderItems,
 } from './core.js';
 
 const BADGE_ICON = { 'Pre-flight Checklist': '🧭', 'Boarding Pass': '🎫', 'Cleared for Takeoff': '🛫', 'Wheels Up': '✈️', 'Touchdown': '🛬' };
@@ -67,6 +67,24 @@ export function renderPortal(root, p, opts = {}) {
     naHtml = `<div class="next done"><div class="next-label">All clear</div><div class="next-title">Everything is up to date 🎉</div></div>`;
   }
   root.append(h(naHtml));
+
+  // Everything else still open (short list; first 5, rest behind a toggle)
+  const rem = reminderItems(p);
+  const mainKey = na.mine?.key;
+  const booked = rem.booked;
+  const bookedTitles = new Set(booked.map(b => b.title));
+  const others = rem.todoSteps.filter(s => s.key !== mainKey && !bookedTitles.has(s.title));
+  if (others.length || booked.length || rem.waiting.length) {
+    // Most important first: booked dates, then open steps in journey order, then items waiting on SAC. Show 3.
+    const items = [
+      ...booked.map(b => `<li class="bk"><span>📅</span><div><b>${esc(b.title)}</b><small>${esc(b.dt ? fmtDateTime(b.date) : fmtDate(b.date))}</small></div></li>`),
+      ...others.map(s => `<li><span>○</span><div><button class="linkish" data-jump="${esc(s.key)}">${esc(nextTitle(s.title))}</button></div></li>`),
+      ...rem.waiting.map(s => `<li class="wt"><span>⏳</span><div>${esc(s.title)}<small>Waiting for SAC to confirm</small></div></li>`),
+    ];
+    const showAll = state.alsoAll, LIMIT = 3;
+    const more = items.length > LIMIT ? `<button class="also-toggle ${showAll ? 'open' : ''}" data-also="1" aria-expanded="${showAll}"><span>${showAll ? 'Show fewer' : `Show all ${items.length} pending items`}</span><i class="chev">⌄</i></button>` : '';
+    root.append(h(`<section class="also"><h4>${p.viewer === 'parent' ? 'Other things still open' : 'Also to do'} <span class="muted small">(${items.length})</span></h4><ul>${(showAll ? items : items.slice(0, LIMIT)).join('')}</ul>${more}</section>`));
+  }
 
   // Flight path
   const fp = h(`<section class="flightpath" aria-label="Visa journey progress"><div class="fp-line"></div></section>`);
@@ -137,6 +155,7 @@ export function renderPortal(root, p, opts = {}) {
 
   // ---------- events ----------
   root.onclick = async e => {
+    if (e.target.closest('[data-also]')) { state.alsoAll = !state.alsoAll; return renderPortal(root, p, opts); }
     const t = e.target.closest('[data-tab],[data-stage-toggle],[data-jump],[data-stage],[data-copy],[data-act]');
     if (!t) return;
     if (t.dataset.tab) { state.tab = t.dataset.tab; renderPortal(root, p, opts); return; }
