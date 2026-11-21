@@ -8,6 +8,9 @@ import {
 const BADGE_ICON = { 'Pre-flight Checklist': '🧭', 'Boarding Pass': '🎫', 'Cleared for Takeoff': '🛫', 'Wheels Up': '✈️', 'Touchdown': '🛬' };
 const SOCIAL_KEYS = { whatsapp: 'social_whatsapp', instagram: 'social_instagram', facebook: 'social_facebook', youtube: 'social_youtube', linkedin: 'social_linkedin' };
 
+// "X paid" reads like a finished task on the Next-step card, so show it as an action: "Pay X".
+const nextTitle = t => /^(.*\S) paid$/.test(t) ? 'Pay ' + t.replace(/ paid$/, '') : t;
+
 export function renderPortal(root, p, opts = {}) {
   const editable = p.viewer === 'student' && opts.onSave;
   const state = root._state || (root._state = { tab: 'visa', open: {} });
@@ -53,7 +56,7 @@ export function renderPortal(root, p, opts = {}) {
   let naHtml;
   if (na.mine) {
     naHtml = `<div class="next"><div class="next-label">${p.viewer === 'parent' ? 'Student’s next step' : 'Your next step'}</div>
-      <div class="next-title">${esc(na.mine.title)}</div>
+      <div class="next-title">${esc(nextTitle(na.mine.title))}</div>
       <button class="btn small ghost" data-jump="${esc(na.mine.key)}">Go to step →</button></div>`;
   } else if (na.waiting) {
     const when = na.exp ? ` · expected by <b>${fmtDate(na.exp.to)}</b>` : '';
