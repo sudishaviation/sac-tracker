@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Student progress · Sudisha Aviation Consultant</title>
+<link rel="icon" href="assets/img/sac-plane-red.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="logos"><img class="sac" src="assets/img/sac-logo-white.png" alt="SAC"><span class="sep"></span><img class="haa" src="assets/img/haa-white.svg" alt="Hillsboro Aero Academy"></div>
+  <div class="spacer"></div><span class="who">Parent / sponsor view</span>
+</header>
+<div id="demo"></div>
+<main id="app" class="wrap"><p class="muted">Loading…</p></main>
+<script type="module">
+import { getApi, DEMO } from './assets/js/api.js';
+import { renderPortal } from './assets/js/journey.js';
+import { $, h, esc } from './assets/js/core.js';
+const api = await getApi();
+const t = new URLSearchParams(location.search).get('t');
+if (DEMO) $('#demo').append(h(`<div class="demo-bar">Demo mode · sample data only. Example: <a href="parent.html?t=sacdemo1parent">Aarav's parent link</a></div>`));
+try {
+  if (!t) throw new Error('This page needs the private link shared by the student or SAC.');
+  const p = await api.parentView(t);
+  const app = $('#app');
+  renderPortal(app, p, { banner: `<div class="notice info">👋 You are viewing <b>${esc(p.student.full_name)}</b>'s progress with Sudisha Aviation Consultant. This view is read-only.</div>` });
+} catch (e) {
+  $('#app').innerHTML = `<div class="card"><h3>Link not available</h3><p>${esc(e.message)}</p></div>`;
+}
+</script>
+</body>
+</html>

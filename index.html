@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>My Journey to HAA · Sudisha Aviation Consultant</title>
+<link rel="icon" href="assets/img/sac-plane-red.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="logos"><img class="sac" src="assets/img/sac-logo-white.png" alt="SAC"><span class="sep"></span><img class="haa" src="assets/img/haa-white.svg" alt="Hillsboro Aero Academy"></div>
+  <div class="spacer"></div>
+  <button id="logout" hidden>Log out</button>
+</header>
+<div id="demo"></div>
+<div id="login" class="login-hero" hidden>
+  <form class="login-card" id="loginForm" autocomplete="off">
+    <div class="brand"><img src="assets/img/sac-logo-red.png" alt="SAC"></div>
+    <h1>Your journey to HAA</h1>
+    <p class="lead">Track every step from application to visa.</p>
+    <div class="field"><label for="code">Student ID</label><input id="code" class="mono" placeholder="SAC-XXXXX" required autocapitalize="characters"></div>
+    <div class="field"><label for="pin">6-digit PIN</label><input id="pin" class="pin" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="••••••" required></div>
+    <div id="loginErr" class="notice err" hidden></div>
+    <button class="btn" type="submit">Check in ✈</button>
+    <div class="login-foot">Don't have an ID? Contact Sudisha Aviation Consultant.<br>Keep your PIN private.</div>
+  </form>
+</div>
+<main id="app" class="wrap" hidden></main>
+<script type="module" src="assets/js/student.js"></script>
+</body>
+</html>
