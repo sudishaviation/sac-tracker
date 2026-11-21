@@ -2,7 +2,7 @@ import { getApi, DEMO } from './api.js';
 import {
   $, $$, h, esc, money, fmtDate, fmtDateTime, toast, copy, basePath, parentLink, buildPayload, adminAlerts,
   STAGES, STATUS_LABEL, STUDENT_STATUS, LEAD_SOURCES, WITHDRAW_REASONS, DOCTOR_GROUPS, currentStage, nextAction,
-  byKey, isComplete, daysBetween,
+  byKey, isComplete, daysBetween, reminderItems,
 } from './core.js';
 
 const api = await getApi();
@@ -55,7 +55,43 @@ function welcomeMessage(s, pin, ptoken) {
 function render() {
   $$('#nav button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   const v = $('#view'); v.innerHTML = '';
-  ({ dash: renderDash, students: renderStudents, add: renderAdd, guide: renderGuide, settings: renderSettings })[view](v);
+  ({ dash: renderDash, students: renderStudents, add: renderAdd, guide: renderGuide, reminders: renderReminders, settings: renderSettings })[view](v);
+}
+
+function reminderText(s) {
+  const r = reminderItems(P(s.id));
+  const st = db.settings.find(x => x.key === 'contact_email')?.value || '';
+  const lines = [`Hi ${s.full_name.split(' ')[0]},`, '', `A quick reminder from Sudisha Aviation Consultant about your HAA journey (Student ID ${s.code}).`, ''];
+  if (r.booked.length) { lines.push('Your booked dates:'); r.booked.forEach(b => lines.push(`• ${b.title} — ${b.dt ? fmtDateTime(b.date) : fmtDate(b.date)}`)); lines.push(''); }
+  if (r.todo.length) { lines.push('Still to do:'); r.todo.forEach(t => lines.push(`• ${t}`)); lines.push(''); }
+  if (!r.booked.length && !r.todo.length) lines.push('You have nothing pending right now. Thank you!', '');
+  lines.push(`Please tick what you have completed in your tracker: ${basePath()}`, 'If something is already done or you need help, just reply to this message.', '', 'Regards,', 'Sudisha Aviation Consultant (SAC)', st);
+  return { text: lines.join('\n'), count: r.booked.length + r.todo.length, next: r.booked[0] };
+}
+
+function openReminder(id) {
+  const s = stu(id); if (!s) return;
+  const { text } = reminderText(s);
+  const subject = 'Reminder: your HAA application steps';
+  const m = h(`<div class="modal"><div class="modal-box"><header><h3>Reminder for ${esc(s.full_name)}</h3><div class="muted small">${s.email ? `To: ${esc(s.email)}` : 'No email on file'} · edit the text if you like, then send it yourself.</div></header>
+    <div class="scroll"><textarea rows="16" style="width:100%;font:inherit"></textarea></div>
+    <footer><div class="actions"><button class="btn" data-a="mail">Open in email app</button><button class="btn ghost" data-a="copy">Copy text</button><button class="btn ghost" data-a="x">Close</button></div></footer></div></div>`);
+  const ta = $('textarea', m); ta.value = text;
+  m.onclick = e => {
+    const a = e.target.closest('[data-a]')?.dataset.a;
+    if (a === 'x' || e.target === m) m.remove();
+    if (a === 'copy') copy(ta.value, 'Reminder copied');
+    if (a === 'mail') window.location.href = `mailto:${encodeURIComponent(s.email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(ta.value)}`;
+  };
+  document.body.append(m);
+}
+
+function renderReminders(v) {
+  const rows = db.students.filter(s => !['withdrawn', 'studying', 'completed'].includes(s.status)).map(s => ({ s, ...reminderText(s) }))
+    .sort((a, b) => (a.next ? new Date(a.next.date) : Infinity) - (b.next ? new Date(b.next.date) : Infinity));
+  v.append(h(`<div class="card"><h3>Reminders</h3><p class="muted small">Students with pending tasks or booked dates. Click Email to review a ready-made reminder, then send it from your own mail. Nothing is sent automatically.</p>
+    <div class="tablewrap"><table class="tbl"><thead><tr><th>Student</th><th>Pending / booked</th><th>Next booked date</th><th></th></tr></thead><tbody>${rows.map(r => `<tr><td><b>${esc(r.s.full_name)}</b> <span class="mono muted small">${esc(r.s.code)}</span></td><td>${r.count}</td><td>${r.next ? `${esc(r.next.title)} · ${esc(r.next.dt ? fmtDateTime(r.next.date) : fmtDate(r.next.date))}` : '—'}</td><td><button class="btn small" data-rem="${r.s.id}">Email</button></td></tr>`).join('') || '<tr><td colspan="4" class="muted">No active students.</td></tr>'}</tbody></table></div></div>`));
+  v.onclick = e => { const b = e.target.closest('[data-rem]'); if (b) openReminder(b.dataset.rem); };
 }
 
 function renderGuide(v) {
@@ -231,7 +267,8 @@ async function openStudent(id) {
     <button class="btn navy small" data-a="pin">Reset PIN</button>
     <button class="btn ghost small" data-a="plink">Copy parent link</button>
     <button class="btn ghost small" data-a="preset">Reset parent link</button>
-    <button class="btn ghost small" data-a="popen">Open parent view</button></div><div id="pinOut"></div>
+    <button class="btn ghost small" data-a="popen">Open parent view</button>
+    <button class="btn ghost small" data-a="remind">Reminder email</button></div><div id="pinOut"></div>
     <p class="muted small">Agreements: ${s.ack_terms_at ? `accepted ${fmtDateTime(s.ack_terms_at)}` : s.consent_recorded_on ? `consent recorded offline on ${fmtDate(s.consent_recorded_on)} · student still ticks at first login` : '<b>not yet accepted</b> (student accepts at first login)'}</p></div>`);
   body.append(qa);
   qa.onclick = async e => {
@@ -239,6 +276,7 @@ async function openStudent(id) {
     try {
       if (a === 'pin') { if (!confirm('Create a new PIN? The old PIN stops working.')) return; const pin = await api.adminResetPin(id); $('#pinOut', qa).innerHTML = ''; $('#pinOut', qa).append(h(`<div class="secret" style="margin-top:10px">New PIN <b>${pin}</b></div>`)); const b = h(`<button class="btn small" style="margin-top:8px">Copy welcome message with new PIN</button>`); b.onclick = () => copy(welcomeMessage(s, pin, s.parent_token), 'Copied'); $('#pinOut', qa).append(b); }
       if (a === 'plink') copy(parentLink(s.parent_token), 'Parent link copied');
+      if (a === 'remind') openReminder(id);
       if (a === 'popen') window.open(parentLink(s.parent_token), '_blank');
       if (a === 'preset') { if (!confirm('Reset the parent link? The old link stops working.')) return; s.parent_token = await api.adminResetParentLink(id); toast('New parent link created'); copy(parentLink(s.parent_token), 'New parent link copied'); }
     } catch (err) { toast(err.message, 'err'); }

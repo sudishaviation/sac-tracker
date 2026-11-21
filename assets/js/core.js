@@ -199,3 +199,28 @@ export function buildPayload(db, sid, viewer) {
     settings: Object.fromEntries(db.settings.map(r => [r.key, r.value])),
   };
 }
+
+
+// ---------- reminders (manual, from admin) ----------
+// What a student still has to do + dates they have booked. p = payload-like {steps}.
+export function reminderItems(p) {
+  const rank = { onboard: 0, visa: 1, departure: 2 };
+  const steps = [...p.steps].sort((a, b) => rank[a.track] - rank[b.track] || a.stage - b.stage || a.sort - b.sort), out = { todo: [], booked: [] };
+  const vStage = currentStage(steps, 'visa');
+  const dOpen = departureUnlocked(steps);
+  const t0 = today();
+  steps.forEach(s => {
+    if (isComplete(s) || s.status === 'na') return;
+    (s.fields || []).forEach(f => {
+      if (f.t !== 'date' && f.t !== 'datetime') return;
+      const v = s.data?.[f.k]; const d = toDate(v);
+      if (d && d >= t0) out.booked.push({ title: s.title, label: f.l, date: v, dt: f.t === 'datetime' });
+    });
+    if (s.status === 'pending' || s.optional || s.actor === 'sac' || s.key === 'arrival') return;
+    if (s.track === 'visa' && s.stage > vStage) return;
+    if (s.track === 'departure' && !dOpen) return;
+    out.todo.push(s.title);
+  });
+  out.booked.sort((a, b) => toDate(a.date) - toDate(b.date));
+  return out;
+}

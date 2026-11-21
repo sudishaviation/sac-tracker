@@ -111,11 +111,11 @@ begin
   select sid, t.key,
          case when t.key = 'program_intake' then 'done'
               when p_stage = 'studying' and not t.optional then 'done'
-              when p_stage = 'visa_granted' and t.track in ('onboard','visa') and not t.optional then 'done'
+              when p_stage = 'visa_granted' and t.track in ('onboard','visa') and not t.optional and t.key <> 'sac_fee_2' then 'done'
               else 'todo' end,
          case when t.key = 'program_intake' then current_date
               when p_stage = 'studying' and not t.optional then current_date
-              when p_stage = 'visa_granted' and t.track in ('onboard','visa') and not t.optional then current_date
+              when p_stage = 'visa_granted' and t.track in ('onboard','visa') and not t.optional and t.key <> 'sac_fee_2' then current_date
               end, 'sac'
     from step_templates t where t.partner = coalesce(part,'HAA');
 

@@ -93,7 +93,9 @@ export function renderPortal(root, p, opts = {}) {
 
   if (state.tab === 'visa') {
     const ob = trackSteps(steps, 'onboard');
-    if (ob.length && ob.some(s => !isComplete(s))) panel.append(stageBlock('Before take-off', 'Join the SAC community', ob, true, 'now'));
+    if (state.obTop === undefined) state.obTop = ob.some(s => !isComplete(s));   // fixed for the session so the block never jumps
+    const obDone = ob.every(isComplete);
+    if (ob.length && state.obTop) panel.append(stageBlock('Before take-off', 'Join the SAC community', ob, state.open.ob ?? true, obDone ? 'done' : 'now', 'ob'));
     STAGES.visa.forEach(s => {
       const list = trackSteps(steps, 'visa').filter(x => x.stage === s.n);
       if (!list.length) return;
@@ -101,7 +103,7 @@ export function renderPortal(root, p, opts = {}) {
       const open = state.open['v' + s.n] ?? (st === 'now');
       panel.append(stageBlock(`${s.n}. ${s.name}`, s.sub, list, open, st, 'v' + s.n));
     });
-    if (ob.length && ob.every(isComplete)) panel.append(stageBlock('Community', 'SAC channels', ob, state.open.ob ?? false, 'done', 'ob'));
+    if (ob.length && !state.obTop) panel.append(stageBlock('Community', 'SAC channels', ob, state.open.ob ?? false, obDone ? 'done' : 'now', 'ob'));
   } else if (state.tab === 'departure') {
     if (!dUnlocked) {
       panel.append(h(`<div class="notice info">🔒 This track opens after your <b>official acceptance</b> from HAA. Then you'll do your CAAN medical, CAAN NOC and Ministry of Education NOC — needed to transfer tuition from Nepal and to show immigration when you fly.</div>`));
@@ -314,7 +316,8 @@ function feesBlock(p) {
   const wrap = h(`<div></div>`);
   if (p.program) wrap.append(h(`<div class="card prog">
     <h3>${esc(p.program.name)}</h3>
-    <div class="kv"><span>Indicative tuition</span><b>${money(p.program.tuition_usd, 'USD')}</b></div>
+    <div class="kv"><span>Total tuition (all instalments)</span><b>${money(p.program.tuition_usd, 'USD')}</b></div>
+    <div class="notice info" style="margin:8px 0"><b>Tuition is paid in instalments.</b> HAA invoices you directly for each upcoming payment and due date. Check your HAA payment portal; HAA also emails every invoice to your HAA email address.</div>
     <div class="kv"><span>Proof of financial capability</span><b>${money(p.program.pofc_usd, 'USD')}</b></div>
     <p class="muted small">Financial capability can be a bank student loan or a sponsor (parents / immediate family). It is required for HAA admission and your I-20.</p></div>`));
   const tbl = h(`<div class="card"><h3>Fees & payments</h3><div class="fees"></div>
