@@ -38,14 +38,15 @@ export function renderPortal(root, p, opts = {}) {
     <div class="pass-stub">
       <label>Student ID</label><b class="mono">${esc(p.student.code)}</b>
       <div class="barcode" aria-hidden="true"></div>
-      <small>${esc(prog.category || '')}</small>
+      <small>${esc(prog.category || '')}${p.student.visa_type && !(prog.category || '').includes(p.student.visa_type) ? ` · ${esc(p.student.visa_type)}` : ''}</small>
     </div>
   </section>`));
 
   if (p.student.status && p.student.status !== 'active') {
-    const label = { deferred: 'Your application is deferred.', withdrawn: 'Your application is withdrawn.', visa_refused: 'Visa refused — talk to SAC about your options.', completed: 'Journey complete. Welcome to HAA!' }[p.student.status];
+    const label = { deferred: 'Your application is deferred.', withdrawn: 'Your application is withdrawn.', visa_refused: 'Visa refused — talk to SAC about your options.', completed: 'Journey complete. Welcome to HAA!', visa_granted: 'Visa granted. Next: departure steps and travel.', studying: 'You are studying at HAA. Keep this page for your records.' }[p.student.status];
     if (label) root.append(h(`<div class="notice info">${esc(label)}</div>`));
   }
+  if (p.student.visa_type === 'M-1' && (p.settings || {}).m1_note) root.append(h(`<div class="notice info"><b>M-1 visa.</b> ${esc(p.settings.m1_note)}</div>`));
   studentWarnings(p).forEach(w => root.append(h(`<div class="notice warn">⚠️ ${esc(w.text)}</div>`)));
 
   // Next action

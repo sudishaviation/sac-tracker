@@ -55,7 +55,7 @@ async function supabaseApi() {
       return Object.fromEntries(tables.map((t, i) => [t, res[i]]));
     },
     adminActivity: id => q(sb.from('activity_log').select('*').eq('student_id', id).order('at', { ascending: false }).limit(25)),
-    adminCreateStudent: s => rpc('admin_create_student', { p_full_name: s.full_name, p_email: s.email, p_phone: s.phone, p_dob: s.dob || null, p_program_id: s.program_id, p_intake_id: Number(s.intake_id), p_lead_source: s.lead_source }),
+    adminCreateStudent: s => rpc('admin_create_student', { p_full_name: s.full_name, p_email: s.email, p_phone: s.phone, p_dob: s.dob || null, p_program_id: s.program_id, p_intake_id: Number(s.intake_id), p_lead_source: s.lead_source, p_visa_type: s.visa_type || null, p_stage: s.stage || 'new', p_haa_student_id: s.haa_student_id || null, p_start_date: s.start_date || null, p_expected_end: s.expected_end_date || null, p_consent_on: s.consent_recorded_on || null }),
     adminResetPin: id => rpc('admin_reset_pin', { p_student: id }),
     adminResetParentLink: id => rpc('admin_reset_parent_link', { p_student: id }),
     adminPurge: () => rpc('admin_purge_expired'),
@@ -125,8 +125,8 @@ function demoApi() {
     adminCreateStudent: async s => {
       await load();
       const id = crypto.randomUUID(), code = 'SAC-' + rnd(5), pin = String(Math.floor(100000 + Math.random() * 900000)), parent_token = rnd(24).toLowerCase();
-      db.students.push({ id, code, _pin: pin, parent_token, full_name: s.full_name, email: s.email, phone: s.phone, dob: s.dob || null, program_id: s.program_id, intake_id: Number(s.intake_id), lead_source: s.lead_source, status: 'active', status_reason: null, ack_terms_at: null, ack_consent_at: null, internal_notes: '', created_at: now(), last_activity_at: now() });
-      db.step_templates.forEach(t => db.student_steps.push({ student_id: id, step_key: t.key, status: t.key === 'program_intake' ? 'done' : 'todo', data: {}, done_at: t.key === 'program_intake' ? isoDate(new Date()) : null }));
+      db.students.push({ id, code, _pin: pin, parent_token, full_name: s.full_name, email: s.email, phone: s.phone, dob: s.dob || null, program_id: s.program_id, intake_id: Number(s.intake_id), lead_source: s.lead_source, visa_type: s.visa_type || (db.programs.find(x => x.id === s.program_id)?.visa_type) || 'F-1', haa_student_id: s.haa_student_id || null, start_date: s.start_date || null, expected_end_date: s.expected_end_date || null, consent_recorded_on: s.consent_recorded_on || null, status: ({ visa_granted: 'visa_granted', studying: 'studying' })[s.stage] || 'active', status_reason: null, ack_terms_at: null, ack_consent_at: null, internal_notes: '', created_at: now(), last_activity_at: now() });
+      db.step_templates.forEach(t => { const done = t.key === 'program_intake' || (!t.optional && (s.stage === 'studying' || (s.stage === 'visa_granted' && t.track !== 'departure'))); db.student_steps.push({ student_id: id, step_key: t.key, status: done ? 'done' : 'todo', data: {}, done_at: done ? isoDate(new Date()) : null }); });
       db.commissions.push({ student_id: id });
       persist(); return { id, code, pin, parent_token };
     },

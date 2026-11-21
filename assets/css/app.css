@@ -206,7 +206,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .tbl input, .tbl select { padding: 6px 8px; font-size: 13px; border-radius: 8px; min-width: 70px; }
 .tablewrap { overflow-x: auto; }
 .pill { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #EEF2F6; color: #344054; white-space: nowrap; }
-.pill.active { background: #ECFDF3; color: #027A48; } .pill.withdrawn { background: #FDECEC; color: #B42318; } .pill.deferred, .pill.visa_refused { background: #FFF7E6; color: #9A5B00; } .pill.completed { background: var(--sky); color: var(--navy); }
+.pill.active { background: #ECFDF3; color: #027A48; } .pill.withdrawn { background: #FDECEC; color: #B42318; } .pill.deferred, .pill.visa_refused { background: #FFF7E6; color: #9A5B00; } .pill.studying, .pill.visa_granted { background: #E8F1FF; color: #1849A9; } .pill.completed { background: var(--sky); color: var(--navy); }
 .flagdot { display: inline-block; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; text-align: center; }
 .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; } .toolbar input, .toolbar select { width: auto; }
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(760px, 100vw); background: var(--paper); box-shadow: -10px 0 40px rgba(0,0,0,.2); z-index: 40; display: flex; flex-direction: column; }
@@ -230,3 +230,10 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .bar { height: 8px; background: #EEF2F6; border-radius: 999px; overflow: hidden; } .bar i { display: block; height: 100%; background: var(--navy); }
 
 @media (max-width: 480px) { .tabs button { font-size: 13px; padding: 8px 8px; } }
+
+/* first-login consent: short summary + folded full text */
+.sum { padding-left: 18px; margin: 10px 0; } .sum li { margin: 8px 0; }
+.fold { border: 1px solid var(--line); border-radius: 10px; margin: 8px 0; }
+.fold summary { cursor: pointer; padding: 10px 12px; font-weight: 600; color: var(--navy); }
+.fold .foldbody { padding: 0 12px 8px; font-size: 13px; }
+.visa-badge { display: inline-block; padding: 2px 8px; border-radius: 99px; background: var(--sky); color: var(--navy); font-size: 11px; font-weight: 700; margin-left: 6px; }

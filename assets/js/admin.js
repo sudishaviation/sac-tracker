@@ -55,7 +55,30 @@ function welcomeMessage(s, pin, ptoken) {
 function render() {
   $$('#nav button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   const v = $('#view'); v.innerHTML = '';
-  ({ dash: renderDash, students: renderStudents, add: renderAdd, settings: renderSettings })[view](v);
+  ({ dash: renderDash, students: renderStudents, add: renderAdd, guide: renderGuide, settings: renderSettings })[view](v);
+}
+
+function renderGuide(v) {
+  const who = { student: 'Student', sac: 'SAC', both: 'Student + SAC' };
+  const feeOf = k => { const f = db.fees.find(x => x.key === k); return f ? `${f.label}: ${f.amount == null ? 'ask for latest' : money(f.amount, f.currency)} → ${f.payee}${f.refundable ? ' (refundable)' : ''}` : ''; };
+  v.append(h(`<div class="card"><h3>HAA procedure — zero to visa, then departure</h3><p class="muted small">Reference only. This is exactly what each student sees. Edit fees, programs and intakes in Settings.</p></div>`));
+  [['onboard', 'Before take-off'], ['visa', 'Visa journey'], ['departure', 'Departure (Nepal NOCs, medical)']].forEach(([track, title]) => {
+    const c = h(`<div class="card"><h3>${title}</h3></div>`);
+    let last = null;
+    db.step_templates.filter(t => t.track === track && t.active !== false).sort((a, b) => a.stage - b.stage || a.sort - b.sort).forEach(t => {
+      if (track !== 'onboard' && t.stage !== last) { last = t.stage; const i = STAGES[track][t.stage - 1]; c.append(h(`<h4 style="margin:14px 0 4px;color:var(--navy)">${t.stage}. ${esc(i?.name || '')} <span class="muted small">${esc(i?.sub || '')}</span></h4>`)); }
+      const fee = t.fee_key ? feeOf(t.fee_key) : '';
+      c.append(h(`<div style="padding:8px 0;border-top:1px solid var(--line)"><b>${esc(t.title)}</b> <span class="tag">${who[t.actor] || ''}${t.optional ? ' · optional' : ''}</span>
+        <div class="small">${esc(t.help || '')}</div>
+        ${fee ? `<div class="small"><b>Fee:</b> ${esc(fee)}</div>` : ''}
+        ${t.expect_min ? `<div class="muted small">Usually ${t.expect_min}–${t.expect_max} working days</div>` : ''}</div>`));
+    });
+    v.append(c);
+  });
+  const f = h(`<div class="card"><h3>All fees</h3><div class="tablewrap"><table class="tbl"><thead><tr><th>Fee</th><th>Amount</th><th>Paid to</th><th>Refundable</th><th>Note</th></tr></thead><tbody>${db.fees.slice().sort((a, b) => a.sort - b.sort).map(x => `<tr><td>${esc(x.label)}</td><td>${x.amount == null ? 'ask' : esc(money(x.amount, x.currency))}</td><td>${esc(x.payee)}</td><td>${x.refundable ? 'Yes' : 'No'}</td><td class="small">${esc(x.note || '')}</td></tr>`).join('')}</tbody></table></div></div>`);
+  v.append(f);
+  const d = h(`<div class="card"><h3>CAAN Class 1 medical — 3 doctors needed</h3><p class="muted small">One physical, one ENT, one eye examiner. Confirm the latest list with CAAN.</p>${['physical', 'ent', 'eye'].map(g => `<h4 style="margin:12px 0 4px">${esc(DOCTOR_GROUPS[g])}</h4>${db.doctors.filter(x => x.grp === g && x.active).map(x => `<div class="small" style="padding:4px 0">${esc(x.name)} — ${esc(x.address || '')} · ${esc(x.phone || '')}</div>`).join('')}`).join('')}</div>`);
+  v.append(d);
 }
 
 function renderDash(v) {
@@ -143,17 +166,33 @@ function renderAdd(v) {
       <div class="field"><label>Phone / WhatsApp</label><input name="phone"></div>
       <div class="field"><label>Date of birth</label><input name="dob" type="date"></div>
       <div class="field"><label>Program *</label><select name="program_id" required>${programOpts()}</select></div>
+      <div class="field"><label>Visa type *</label><select name="visa_type" required>${opts([['F-1', 'F-1 student visa'], ['M-1', 'M-1 student visa']], '', 'Choose program first…')}</select></div>
       <div class="field"><label>Intake *</label><select name="intake_id" required>${intakeOpts()}</select></div>
       <div class="field"><label>Lead source *</label><select name="lead_source" required>${opts(LEAD_SOURCES.map(x => [x, x]), '', 'How did they find us?')}</select></div>
-    </div><div id="ageWarn"></div><button class="btn" type="submit">Create student</button></form><div id="created"></div></div>`));
+      <div class="field" style="grid-column:1/-1"><label>Where are they now? *</label><select name="stage">
+        <option value="new">New applicant — starting from zero</option>
+        <option value="visa_granted">Visa already granted — awaiting departure</option>
+        <option value="studying">Already studying at HAA</option></select></div>
+    </div>
+    <div id="existingBox" class="card" style="display:none;background:var(--sky)"><h4 style="margin:0 0 6px">Existing student details</h4>
+      <p class="muted small">Earlier steps are marked done automatically (dated today). Correct any dates later in the student's Journey. For a past intake, add it first in Settings → Intakes.</p>
+      <div class="formgrid">
+      <div class="field"><label>HAA student ID</label><input name="haa_student_id"></div>
+      <div class="field"><label>Actual start date</label><input name="start_date" type="date"></div>
+      <div class="field"><label>Expected completion</label><input name="expected_end_date" type="date"></div>
+      <div class="field"><label>Data consent recorded on</label><input name="consent_recorded_on" type="date"></div></div>
+      <p class="muted small">If consent was given offline (signed form / email), enter that date. Otherwise the student accepts it on first login.</p></div>
+    <div id="ageWarn"></div><button class="btn" type="submit">Create student</button></form><div id="created"></div></div>`));
   const f = $('#addForm');
+  f.program_id.onchange = () => { const pr = db.programs.find(x => x.id === f.program_id.value); if (pr) f.visa_type.value = pr.visa_type || 'F-1'; };
+  f.stage.onchange = () => { $('#existingBox').style.display = f.stage.value === 'new' ? 'none' : 'block'; };
   f.dob.onchange = () => {
     const age = (new Date() - new Date(f.dob.value)) / (365.25 * 864e5);
     $('#ageWarn').innerHTML = f.dob.value && age < 18 ? `<div class="notice warn">This student is under 18 — not eligible yet.</div>` : '';
   };
   f.intake_id.onchange = () => {
     const i = db.intakes.find(x => String(x.id) === f.intake_id.value);
-    $('#ageWarn').innerHTML = i?.note && !i.recommended ? `<div class="notice warn">${esc(i.note)}</div>` : '';
+    $('#ageWarn').innerHTML = f.stage.value === 'new' && i?.note && !i.recommended ? `<div class="notice warn">${esc(i.note)}</div>` : '';
   };
   f.onsubmit = async e => {
     e.preventDefault();
@@ -193,7 +232,7 @@ async function openStudent(id) {
     <button class="btn ghost small" data-a="plink">Copy parent link</button>
     <button class="btn ghost small" data-a="preset">Reset parent link</button>
     <button class="btn ghost small" data-a="popen">Open parent view</button></div><div id="pinOut"></div>
-    <p class="muted small">Agreements: ${s.ack_terms_at ? `accepted ${fmtDateTime(s.ack_terms_at)}` : '<b>not yet accepted</b> (student accepts at first login)'}</p></div>`);
+    <p class="muted small">Agreements: ${s.ack_terms_at ? `accepted ${fmtDateTime(s.ack_terms_at)}` : s.consent_recorded_on ? `consent recorded offline on ${fmtDate(s.consent_recorded_on)} · student still ticks at first login` : '<b>not yet accepted</b> (student accepts at first login)'}</p></div>`);
   body.append(qa);
   qa.onclick = async e => {
     const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
@@ -213,7 +252,12 @@ async function openStudent(id) {
     <div class="field"><label>Date of birth</label><input name="dob" type="date" value="${esc(s.dob || '')}"></div>
     <div class="field"><label>Program</label><select name="program_id">${programOpts(s.program_id)}</select></div>
     <div class="field"><label>Intake</label><select name="intake_id">${intakeOpts(s.intake_id)}</select></div>
+    <div class="field"><label>Visa type</label><select name="visa_type">${opts([['F-1', 'F-1 student visa'], ['M-1', 'M-1 student visa']], s.visa_type || 'F-1', null)}</select></div>
     <div class="field"><label>Lead source</label><select name="lead_source">${opts(LEAD_SOURCES.map(x => [x, x]), s.lead_source, '—')}</select></div>
+    <div class="field"><label>HAA student ID</label><input name="haa_student_id" value="${esc(s.haa_student_id || '')}"></div>
+    <div class="field"><label>Actual start date</label><input name="start_date" type="date" value="${esc(s.start_date || '')}"></div>
+    <div class="field"><label>Expected completion</label><input name="expected_end_date" type="date" value="${esc(s.expected_end_date || '')}"></div>
+    <div class="field"><label>Consent recorded offline on</label><input name="consent_recorded_on" type="date" value="${esc(s.consent_recorded_on || '')}"></div>
     <div class="field"><label>Status</label><select name="status">${opts(Object.entries(STUDENT_STATUS), s.status, null)}</select></div>
     <div class="field"><label>Reason (withdrawn / deferred / refused)</label><select name="status_reason">${opts(WITHDRAW_REASONS.map(x => [x, x]), s.status_reason, '—')}</select></div>
     </div><div class="field"><label>Internal notes (SAC only)</label><textarea name="internal_notes" rows="3">${esc(s.internal_notes || '')}</textarea></div>
@@ -223,7 +267,7 @@ async function openStudent(id) {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.target));
     data.intake_id = data.intake_id ? Number(data.intake_id) : null; data.dob = data.dob || null;
-    for (const k of ['lead_source', 'status_reason', 'program_id']) data[k] = data[k] || null;
+    for (const k of ['lead_source', 'status_reason', 'program_id', 'haa_student_id', 'start_date', 'expected_end_date', 'consent_recorded_on']) data[k] = data[k] || null;
     try { await api.adminSaveStudent(id, data); Object.assign(s, data); toast('Profile saved'); render(); openStudent(id); }
     catch (err) { toast(err.message, 'err'); }
   };
@@ -313,7 +357,7 @@ async function openStudent(id) {
 
 // ---------------- settings ----------------
 const SETTINGS = {
-  programs: { label: 'Programs', pk: 'id', cols: [['name', 'Name'], ['short_name', 'Short'], ['category', 'Category'], ['tuition_usd', 'Tuition USD', 'num'], ['pofc_usd', 'Proof of funds USD', 'num'], ['active', 'Active', 'bool']] },
+  programs: { label: 'Programs', pk: 'id', cols: [['name', 'Name'], ['short_name', 'Short'], ['category', 'Category'], ['tuition_usd', 'Tuition USD', 'num'], ['pofc_usd', 'Proof of funds USD', 'num'], ['active', 'Active', 'bool'], ['visa_type', 'Visa', 'ro']] },
   intakes: { label: 'Intakes', pk: 'id', add: true, cols: [['label', 'Label'], ['start_month', 'Start (1st of month)', 'date'], ['status', 'Status'], ['note', 'Note to students'], ['recommended', 'Recommended', 'bool'], ['active', 'Show', 'bool']] },
   fees: { label: 'Fees', pk: 'key', cols: [['label', 'Fee'], ['amount', 'Amount', 'num'], ['currency', 'Cur.'], ['payee', 'Paid to'], ['refundable', 'Refundable', 'bool'], ['note', 'Note']] },
   doctors: { label: 'CAAN doctors', pk: 'id', add: true, cols: [['grp', 'Group', 'grp'], ['name', 'Name'], ['address', 'Address'], ['phone', 'Phone'], ['email', 'Email'], ['active', 'Show', 'bool']] },

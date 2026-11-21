@@ -22,7 +22,7 @@ export const STAGES = {
 };
 
 export const STATUS_LABEL = { todo: 'To do', pending: 'Waiting for SAC to confirm', done: 'Done', na: 'Not needed' };
-export const STUDENT_STATUS = { active: 'Active', deferred: 'Deferred', withdrawn: 'Withdrawn', visa_refused: 'Visa refused', completed: 'Completed' };
+export const STUDENT_STATUS = { active: 'Active', deferred: 'Deferred', withdrawn: 'Withdrawn', visa_refused: 'Visa refused', visa_granted: 'Visa granted – awaiting departure', studying: 'Studying at HAA', completed: 'Graduated' };
 export const LEAD_SOURCES = ['Instagram', 'Facebook', 'Google Ads', 'Website', 'TikTok', 'Expo', 'Other'];
 export const WITHDRAW_REASONS = ['Finance', 'Family', 'Chose another school', 'Visa refused', 'Personal / health', 'No response', 'Other'];
 export const DOCTOR_GROUPS = { physical: 'Physical & Mental', ent: 'Ear, Nose, Throat & Hearing', eye: 'Eye, Vision & Colour' };
@@ -140,9 +140,10 @@ export function feeRows(p) {
 export function studentWarnings(p) {
   const w = [];
   const keyed = byKey(p.steps);
-  if (p.intake?.note && !p.intake.recommended) w.push({ kind: 'warn', text: `${p.intake.label}: ${p.intake.note}` });
+  const past = ['visa_granted', 'studying', 'completed'].includes(p.student?.status);
+  if (!past && p.intake?.note && !p.intake.recommended) w.push({ kind: 'warn', text: `${p.intake.label}: ${p.intake.note}` });
   const exp = keyed.doc_passport?.data?.passport_expiry;
-  if (exp && p.intake) {
+  if (!past && exp && p.intake) {
     const limit = new Date(toDate(p.intake.start_month)); limit.setMonth(limit.getMonth() + 6);
     if (toDate(exp) < limit) w.push({ kind: 'warn', text: `Your passport expires on ${fmtDate(exp)}. Talk to SAC about renewing it before your visa interview.` });
   }
@@ -153,13 +154,13 @@ export function studentWarnings(p) {
 export function adminAlerts(stu, p) {
   const out = [];
   const keyed = byKey(p.steps);
-  if (stu.status === 'withdrawn' || stu.status === 'completed') return out;
+  if (['withdrawn', 'completed', 'studying'].includes(stu.status)) return out;
   p.steps.filter(s => s.status === 'pending').forEach(s => out.push({ level: 'verify', text: `Verify: ${s.title}`, step: s.key }));
   p.steps.forEach(s => { const e = expectation(s, keyed); if (e?.overdue) out.push({ level: 'red', text: `Overdue: ${s.title} (expected by ${fmtDate(e.to)})`, step: s.key }); });
   const idle = daysBetween(stu.last_activity_at, new Date());
   if (stu.status === 'active' && idle >= 14) out.push({ level: 'amber', text: `No movement for ${idle} days` });
   const visaDone = keyed.visa_result && isComplete(keyed.visa_result);
-  if (p.intake && stu.status === 'active') {
+  if (p.intake && (stu.status === 'active' || stu.status === 'visa_granted')) {
     const left = daysBetween(today(), p.intake.start_month);
     if (p.intake.note && !p.intake.recommended && !visaDone) out.push({ level: 'amber', text: `Tight intake: ${p.intake.label}` });
     if (keyed.moest_noc && !isComplete(keyed.moest_noc) && left <= 21 && left >= -30)
@@ -188,7 +189,7 @@ export function buildPayload(db, sid, viewer) {
     const r = rows.find(x => x.step_key === t.key);
     return { ...t, status: r?.status || 'todo', data: r?.data || {}, done_at: r?.done_at || null };
   }).sort((a, b) => a.track.localeCompare(b.track) || a.stage - b.stage || a.sort - b.sort);
-  const student = { code: s.code, full_name: s.full_name, status: s.status, ack_terms_at: s.ack_terms_at, ack_consent_at: s.ack_consent_at, created_at: s.created_at };
+  const student = { code: s.code, full_name: s.full_name, status: s.status, ack_terms_at: s.ack_terms_at, ack_consent_at: s.ack_consent_at, created_at: s.created_at, visa_type: s.visa_type || program?.visa_type || 'F-1', haa_student_id: s.haa_student_id, start_date: s.start_date, expected_end_date: s.expected_end_date };
   if (viewer !== 'parent') Object.assign(student, { email: s.email, phone: s.phone, parent_token: s.parent_token, status_reason: s.status_reason });
   return {
     viewer, student, program, intake, steps,

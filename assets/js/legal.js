@@ -1,4 +1,4 @@
-// Approved by SAC on 21 Nov 2026. Pending review by a Nepal lawyer.
+// Approved by SAC and by SAC's Nepal lawyer (Nov 2026). Do not edit wording without lawyer sign-off.
 export const TERMS = `
 <h4>Fees &amp; Non-Refund Acknowledgement</h4>
 <ol>
