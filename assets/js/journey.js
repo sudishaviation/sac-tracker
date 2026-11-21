@@ -2,13 +2,14 @@
 import {
   STAGES, STATUS_LABEL, DOCTOR_GROUPS, esc, h, $, $$, money, fmtDate, fmtDateTime, isComplete, byKey,
   trackSteps, currentStage, stageDone, departureUnlocked, expectation, studentCanEdit, nextAction,
-  badges, feeRows, studentWarnings, toast, copy, parentLink, reminderItems,
+  feeRows, studentWarnings, toast, copy, parentLink, reminderItems,
 } from './core.js';
 
-const BADGE_ICON = { 'Pre-flight Checklist': '🧭', 'Boarding Pass': '🎫', 'Cleared for Takeoff': '🛫', 'Wheels Up': '✈️', 'Touchdown': '🛬' };
 const SOCIAL_KEYS = { whatsapp: 'social_whatsapp', instagram: 'social_instagram', facebook: 'social_facebook', youtube: 'social_youtube', linkedin: 'social_linkedin' };
 
 // "X paid" reads like a finished task on the Next-step card, so show it as an action: "Pay X".
+// [label](https://…) in step help becomes a link (help text is written by SAC admins only)
+const linkify = t => esc(t).replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
 const nextTitle = t => /^(.*\S) paid$/.test(t) ? 'Pay ' + t.replace(/ paid$/, '') : t;
 
 export function renderPortal(root, p, opts = {}) {
@@ -97,14 +98,8 @@ export function renderPortal(root, p, opts = {}) {
   fp.append(h(`<div class="fp-plane" style="left:calc(${Math.min(pct, 100)}% * 0.857 + 7.1%)">✈</div>`));
   root.append(fp);
 
-  // Badges
-  const bWrap = h(`<section class="badges"></section>`);
-  badges(steps).forEach(b => bWrap.append(h(`<div class="badge ${b.earned ? 'earned' : ''}" title="${b.earned ? 'Earned' : 'Not yet earned'}">
-    <span>${BADGE_ICON[b.name] || '⭐'}</span><small>${esc(b.name)}</small></div>`)));
-  root.append(bWrap);
-
   // Tabs
-  const tabs = [['visa', 'Visa journey'], ['departure', 'Departure'], ['fees', 'Fees & payments']];
+  const tabs = [['visa', 'Journey'], ['fees', 'Fees & payments']];
   if (p.viewer === 'student') tabs.push(['share', 'Parent link']);
   const tabBar = h(`<nav class="tabs" role="tablist"></nav>`);
   tabs.forEach(([k, l]) => tabBar.append(h(`<button role="tab" class="${state.tab === k ? 'active' : ''}" data-tab="${k}">${l}</button>`)));
@@ -116,7 +111,7 @@ export function renderPortal(root, p, opts = {}) {
     const ob = trackSteps(steps, 'onboard');
     if (state.obTop === undefined) state.obTop = ob.some(s => !isComplete(s));   // fixed for the session so the block never jumps
     const obDone = ob.every(isComplete);
-    if (ob.length && state.obTop) panel.append(stageBlock('Before take-off', 'Join the SAC community', ob, state.open.ob ?? true, obDone ? 'done' : 'now', 'ob'));
+    if (ob.length && state.obTop) panel.append(stageBlock('Before take-off', 'Community & free Pre-Flight Academy', ob, state.open.ob ?? true, obDone ? 'done' : 'now', 'ob'));
     STAGES.visa.forEach(s => {
       const list = trackSteps(steps, 'visa').filter(x => x.stage === s.n);
       if (!list.length) return;
@@ -124,10 +119,10 @@ export function renderPortal(root, p, opts = {}) {
       const open = state.open['v' + s.n] ?? (st === 'now');
       panel.append(stageBlock(`${s.n}. ${s.name}`, s.sub, list, open, st, 'v' + s.n));
     });
-    if (ob.length && !state.obTop) panel.append(stageBlock('Community', 'SAC channels', ob, state.open.ob ?? false, obDone ? 'done' : 'now', 'ob'));
-  } else if (state.tab === 'departure') {
+    // Departure (Nepal NOCs, medical) — same tab, locked until HAA's official acceptance
+    panel.append(h(`<h3 class="subhead">Departure — medical &amp; NOCs</h3>`));
     if (!dUnlocked) {
-      panel.append(h(`<div class="notice info">🔒 This track opens after your <b>official acceptance</b> from HAA. Then you'll do your CAAN medical, CAAN NOC and Ministry of Education NOC — needed to transfer tuition from Nepal and to show immigration when you fly.</div>`));
+      panel.append(h(`<div class="notice info">🔒 Opens after your <b>official acceptance</b> from HAA. Then you do your CAAN medical, CAAN NOC and Ministry of Education NOC — needed to transfer tuition from Nepal and to show immigration when you fly.</div>`));
     }
     const dStage = currentStage(steps, 'departure');
     STAGES.departure.forEach(s => {
@@ -137,6 +132,7 @@ export function renderPortal(root, p, opts = {}) {
       const open = state.open['d' + s.n] ?? (st === 'now');
       panel.append(stageBlock(`${s.n}. ${s.name}`, s.sub, list, open, st, 'd' + s.n, !dUnlocked));
     });
+    if (ob.length && !state.obTop) panel.append(stageBlock('Community', 'SAC channels', ob, state.open.ob ?? false, obDone ? 'done' : 'now', 'ob'));
   } else if (state.tab === 'fees') {
     panel.append(feesBlock(p));
   } else if (state.tab === 'share') {
@@ -164,7 +160,7 @@ export function renderPortal(root, p, opts = {}) {
     if (t.dataset.stage) { state.tab = 'visa'; state.open['v' + t.dataset.stage] = true; renderPortal(root, p, opts); $(`[data-stage-key="v${t.dataset.stage}"]`, root)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
     if (t.dataset.jump) {
       const s = keyed[t.dataset.jump];
-      state.tab = s.track === 'departure' ? 'departure' : 'visa';
+      state.tab = 'visa';
       if (s.track !== 'onboard') state.open[(s.track === 'visa' ? 'v' : 'd') + s.stage] = true;
       renderPortal(root, p, opts);
       const el = $(`[data-step="${s.key}"]`, root); el?.scrollIntoView({ behavior: 'smooth', block: 'center' }); el?.classList.add('flash');
@@ -202,14 +198,10 @@ export function renderPortal(root, p, opts = {}) {
   };
 
   async function save(key, done, data) {
-    const before = badges(p.steps).filter(b => b.earned).map(b => b.name);
     try {
       const np = await opts.onSave(key, done, data);
-      const after = badges(np.steps).filter(b => b.earned).map(b => b.name);
-      const fresh = after.filter(b => !before.includes(b));
       renderPortal(root, np, opts);
-      if (fresh.length) celebrate(fresh[0]);
-      else toast(done ? (keyed[key].needs_verify ? 'Sent to SAC for confirmation' : 'Nice! Step completed') : 'Saved');
+      toast(done ? (keyed[key].needs_verify ? 'Sent to SAC for confirmation' : 'Nice! Step completed') : 'Saved');
     } catch (err) { toast(err.message || 'Could not save', 'err'); }
   }
 
@@ -237,7 +229,7 @@ export function renderPortal(root, p, opts = {}) {
       <div class="step-body">
         <div class="step-title">${esc(s.title)} ${s.optional ? '<span class="tag">optional</span>' : ''}
           ${s.status !== 'todo' ? `<span class="chip c-${s.status}">${STATUS_LABEL[s.status]}</span>` : ''}</div>
-        ${s.help ? `<p class="help">${esc(s.help)}</p>` : ''}
+        ${s.help ? `<p class="help">${linkify(s.help)}</p>` : ''}
       </div></article>`);
     const body = $('.step-body', card);
     if (s.key === 'doc_financial' && p.program) body.append(h(`<p class="pofc">Your program requires proof of financial capability of <b>${money(p.program.pofc_usd, 'USD')}</b>.</p>`));
@@ -354,14 +346,3 @@ function feesBlock(p) {
   return wrap;
 }
 
-function celebrate(name) {
-  const el = h(`<div class="celebrate"><div class="cbox"><div class="cicon">${BADGE_ICON[name] || '⭐'}</div><div class="clabel">Badge earned</div><div class="cname">${esc(name)}</div><button class="btn">Continue</button></div></div>`);
-  document.body.append(el);
-  for (let i = 0; i < 40; i++) {
-    const c = document.createElement('i'); c.className = 'confetti';
-    c.style.left = Math.random() * 100 + 'vw'; c.style.animationDelay = Math.random() * 0.6 + 's';
-    c.style.background = ['#EE1C25', '#002E6D', '#F5B700', '#1FA971'][i % 4];
-    el.append(c);
-  }
-  el.onclick = e => { if (e.target.closest('button') || e.target === el) el.remove(); };
-}

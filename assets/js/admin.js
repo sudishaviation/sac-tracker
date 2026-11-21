@@ -6,7 +6,7 @@ import {
 } from './core.js';
 
 const api = await getApi();
-let db = null, view = 'dash';
+let db = null, view = 'students';
 
 if (DEMO) {
   $('#demo').append(h(`<div class="demo-bar">Demo mode · sample data in this browser only. Any email/password logs in. <button id="resetDemo">Reset demo</button></div>`));
@@ -55,7 +55,7 @@ function welcomeMessage(s, pin, ptoken) {
 function render() {
   $$('#nav button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   const v = $('#view'); v.innerHTML = '';
-  ({ dash: renderDash, students: renderStudents, add: renderAdd, guide: renderGuide, reminders: renderReminders, settings: renderSettings })[view](v);
+  ({ students: renderStudentsHome, add: renderAdd, reminders: renderReminders, settings: renderSettings })[view](v);
 }
 
 function reminderText(s) {
@@ -117,6 +117,15 @@ function renderGuide(v) {
   v.append(d);
 }
 
+function attentionCard() {
+  const alerts = db.students.flatMap(s => rowAlerts(s).map(a => ({ ...a, s })));
+  const order = { verify: 0, red: 1, amber: 2 };
+  const al = h(`<div class="card alerts"><h3>Needs your attention</h3>${alerts.length ? '' : '<p class="muted">All clear ✈</p>'}</div>`);
+  alerts.sort((a, b) => order[a.level] - order[b.level]).forEach(a => al.append(h(`<div class="al" data-open="${a.s.id}"><span class="lvl ${a.level}"></span><div><b>${esc(a.text)}</b><small>${esc(a.s.full_name)} · ${esc(a.s.code)}</small></div></div>`)));
+  return al;
+}
+
+// Stats (pipeline, lead sources, commission) — shown folded under the student list
 function renderDash(v) {
   const live = db.students.filter(s => s.status !== 'withdrawn');
   const active = db.students.filter(s => s.status === 'active');
@@ -133,10 +142,7 @@ function renderDash(v) {
     <div class="kpi"><label>Commission (USD)</label><b style="font-size:18px">${money(rec, '')} <span class="muted small">/ ${money(exp, '')} expected</span></b></div>
   </div>`));
   const g = h(`<div class="grid2"><div></div><div></div></div>`); v.append(g);
-  const order = { verify: 0, red: 1, amber: 2 };
-  const al = h(`<div class="card alerts"><h3>Needs your attention</h3>${alerts.length ? '' : '<p class="muted">All clear ✈</p>'}</div>`);
-  alerts.sort((a, b) => order[a.level] - order[b.level]).forEach(a => al.append(h(`<div class="al" data-open="${a.s.id}"><span class="lvl ${a.level}"></span><div><b>${esc(a.text)}</b><small>${esc(a.s.full_name)} · ${esc(a.s.code)}</small></div></div>`)));
-  g.children[0].append(al);
+
 
   const pipe = h(`<div class="card"><h3>Pipeline (active students)</h3></div>`);
   const counts = {}; active.forEach(s => { const st = currentStage(P(s.id).steps, 'visa'); counts[st] = (counts[st] || 0) + 1; });
@@ -157,6 +163,15 @@ function renderDash(v) {
   const intk = h(`<div class="card"><h3>By intake</h3><table class="tbl"><tbody></tbody></table></div>`);
   db.intakes.forEach(i => { const n = live.filter(s => s.intake_id === i.id).length; if (n) $('tbody', intk).append(h(`<tr><td>${esc(i.label)}${i.note && !i.recommended ? ' ⚠️' : ''}</td><td>${n}</td></tr>`)); });
   g.children[0].append(intk);
+  v.onclick = e => { const o = e.target.closest('[data-open]'); if (o) openStudent(o.dataset.open); };
+}
+
+function renderStudentsHome(v) {
+  v.append(attentionCard());
+  const list = h('<div></div>'); v.append(list);
+  renderStudents(list);
+  const st = h('<details class="card" style="margin-top:14px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Stats — pipeline, lead sources, commission</summary><div style="margin-top:12px"></div></details>');
+  v.append(st); renderDash($('div', st));
   v.onclick = e => { const o = e.target.closest('[data-open]'); if (o) openStudent(o.dataset.open); };
 }
 
@@ -400,6 +415,7 @@ const SETTINGS = {
   fees: { label: 'Fees', pk: 'key', cols: [['label', 'Fee'], ['amount', 'Amount', 'num'], ['currency', 'Cur.'], ['payee', 'Paid to'], ['refundable', 'Refundable', 'bool'], ['note', 'Note']] },
   doctors: { label: 'CAAN doctors', pk: 'id', add: true, cols: [['grp', 'Group', 'grp'], ['name', 'Name'], ['address', 'Address'], ['phone', 'Phone'], ['email', 'Email'], ['active', 'Show', 'bool']] },
   settings: { label: 'General', pk: 'key', cols: [['label', 'Setting', 'ro'], ['value', 'Value']] },
+  guide: { label: 'HAA guide', custom: true },
 };
 let setTab = 'intakes';
 function renderSettings(v) {
@@ -408,6 +424,7 @@ function renderSettings(v) {
   v.append(c);
   $('.subtabs', c).onclick = e => { const b = e.target.closest('[data-st]'); if (b) { setTab = b.dataset.st; render(); } };
   const cfg = SETTINGS[setTab];
+  if (cfg.custom) { $('.tablewrap', c)?.remove(); renderGuide(v); return; }
   const tbl = h(`<table class="tbl"><thead><tr>${cfg.cols.map(x => `<th>${x[1]}</th>`).join('')}<th></th></tr></thead><tbody></tbody></table>`);
   $('.tablewrap', c).append(tbl);
   const cell = (col, val) => {
