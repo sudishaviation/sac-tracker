@@ -303,6 +303,7 @@ export function renderPortal(root, p, opts = {}) {
         <div class="doc-info">${(() => { const d = docs.find(x => String(x.id) === String(v)); return d ? doctorHtml(d) : ''; })()}</div>
         <p class="muted small">List from CAAN FSSD — it can change. Confirm with CAAN or SAC. SAC can book the appointment for you.</p>`;
     } else if (f.t === 'check') input = `<input type="checkbox" id="${id}" data-k="${f.k}" ${v ? 'checked' : ''}>`;
+    else if (f.t === 'number') input = `<input type="number" inputmode="decimal" step="0.01" min="0" id="${id}" data-k="${f.k}" value="${esc(v ?? '')}">`;
     else input = `<input type="text" id="${id}" data-k="${f.k}" value="${esc(v || '')}">`;
     return h(`<div class="field"><label for="${id}">${esc(f.l)}</label>${input}</div>`);
   }
@@ -326,11 +327,11 @@ function requiredMissing(s, data) {
 }
 
 function feesBlock(p) {
-  const rows = feeRows(p);
+  const rows = feeRows(p).filter(r => r.key !== 'tuition');   // tuition is billed by HAA directly — SAC does not track it
   const wrap = h(`<div></div>`);
   if (p.program) wrap.append(h(`<div class="card prog">
     <h3>${esc(p.program.name)}</h3>
-    <div class="kv"><span>Total tuition (all instalments)</span><b>${money(p.program.tuition_usd, 'USD')}</b></div>
+    <div class="kv"><span>Total tuition (paid to HAA in instalments)</span><b>${money(p.program.tuition_usd, 'USD')}</b></div>
     <div class="notice info" style="margin:8px 0"><b>Tuition is paid in instalments.</b> HAA invoices you directly for each upcoming payment and due date. Check your HAA payment portal; HAA also emails every invoice to your HAA email address.</div>
     <div class="kv"><span>Proof of financial capability</span><b>${money(p.program.pofc_usd, 'USD')}</b></div>
     <p class="muted small">Financial capability can be a bank student loan or a sponsor (parents / immediate family). It is required for HAA admission and your I-20.</p></div>`));
