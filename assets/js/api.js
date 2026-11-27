@@ -45,21 +45,44 @@ async function supabaseApi() {
     adminSignIn: async (email, password) => {
       const { error } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw friendly(error);
-      if (!(await rpc('is_admin'))) { await sb.auth.signOut(); throw new Error('This account is not an SAC admin.'); }
+      if (!(await rpc('my_role'))) { await sb.auth.signOut(); throw new Error('This account is not an active SAC team member.'); }
     },
-    adminSession: async () => { const { data } = await sb.auth.getSession(); if (!data.session) return null; try { return (await rpc('is_admin')) ? data.session.user.email : null; } catch { return null; } },
+    // Returns { email, role } where role is 'owner' or 'counsellor', or null when not signed in.
+    adminSession: async () => {
+      const { data } = await sb.auth.getSession(); if (!data.session) return null;
+      try { const role = await rpc('my_role'); return role ? { email: data.session.user.email, role } : null; } catch { return null; }
+    },
     adminSignOut: () => sb.auth.signOut(),
-    adminLoadAll: async () => {
-      const tables = ['students', 'student_steps', 'step_templates', 'programs', 'intakes', 'fees', 'doctors', 'settings', 'commissions'];
-      const res = await Promise.all(tables.map(t => q(sb.from(t).select('*'))));
-      return Object.fromEntries(tables.map((t, i) => [t, res[i]]));
+    adminLoadAll: async (role = 'owner') => {
+      if (role === 'owner') {
+        const tables = ['students', 'student_steps', 'step_templates', 'programs', 'intakes', 'fees', 'doctors', 'settings', 'commissions'];
+        const res = await Promise.all(tables.map(t => q(sb.from(t).select('*'))));
+        return Object.fromEntries(tables.map((t, i) => [t, res[i]]));
+      }
+      // Counsellors: students come through a function without PIN data; commission is never loaded.
+      const tables = ['student_steps', 'step_templates', 'programs', 'intakes', 'fees', 'doctors', 'settings'];
+      const [students, ...res] = await Promise.all([rpc('staff_students'), ...tables.map(t => q(sb.from(t).select('*')))]);
+      return { students: students || [], commissions: [], ...Object.fromEntries(tables.map((t, i) => [t, res[i]])) };
     },
+    // ---- Knowledge Hub ----
+    kbLoad: async () => {
+      const [qa, facts] = await Promise.all([
+        q(sb.from('kb_qa_rendered').select('id,slug,question,variants,category,audience,channels,status,needs_review,review_reason,answer_short_rendered,answer_long_rendered,source_refs,updated_at').neq('status', 'retired').order('category').order('question')),
+        q(sb.from('kb_all_facts').select('*')),
+      ]);
+      return { qa, facts };
+    },
+    kbRemarks: () => q(sb.from('kb_remarks').select('*').order('created_at', { ascending: false }).limit(200)),
+    kbAddRemark: r => q(sb.from('kb_remarks').insert(r).select().single()),
+    kbResolveRemark: (id, status, owner_reply) => q(sb.from('kb_remarks').update({ status, owner_reply, resolved_at: new Date().toISOString() }).eq('id', id).select().single()),
+    kbLogEnquiry: r => q(sb.from('kb_enquiries').insert(r).select().single()),
+    kbEnquiries: () => q(sb.from('kb_enquiries').select('*').order('received_at', { ascending: false }).limit(200)),
     adminActivity: id => q(sb.from('activity_log').select('*').eq('student_id', id).order('at', { ascending: false }).limit(25)),
     adminCreateStudent: s => rpc('admin_create_student', { p_full_name: s.full_name, p_email: s.email, p_phone: s.phone, p_dob: s.dob || null, p_program_id: s.program_id, p_intake_id: Number(s.intake_id), p_lead_source: s.lead_source, p_visa_type: s.visa_type || null, p_stage: s.stage || 'new', p_haa_student_id: s.haa_student_id || null, p_start_date: s.start_date || null, p_expected_end: s.expected_end_date || null, p_consent_on: s.consent_recorded_on || null }),
     adminResetPin: id => rpc('admin_reset_pin', { p_student: id }),
     adminResetParentLink: id => rpc('admin_reset_parent_link', { p_student: id }),
     adminPurge: () => rpc('admin_purge_expired'),
-    adminSaveStudent: (id, patch) => q(sb.from('students').update(patch).eq('id', id).select().single()),
+    adminSaveStudent: (id, patch) => q(sb.from('students').update(patch).eq('id', id)),
     adminSaveStep: (student_id, step_key, patch) => q(sb.from('student_steps').upsert({ student_id, step_key, ...patch, updated_by: 'sac', updated_at: new Date().toISOString() }).select().single()),
     adminSaveCommission: (student_id, patch) => q(sb.from('commissions').upsert({ student_id, ...patch }).select().single()),
     adminSaveRow: (table, pk, val, patch) => q(sb.from(table).update(patch).eq(pk, val).select().single()),
@@ -118,7 +141,13 @@ function demoApi() {
     parentView: async token => { await load(); const s = db.students.find(x => x.parent_token === token && x.status !== 'withdrawn'); if (!s) throw friendly('INVALID_LINK'); return buildPayload(db, s.id, 'parent'); },
 
     adminSignIn: async email => { adminEmail = email || 'demo@sac'; sessionStorage.setItem('sac-demo-admin', adminEmail); },
-    adminSession: async () => adminEmail,
+    adminSession: async () => (adminEmail ? { email: adminEmail, role: 'owner' } : null),
+    kbLoad: async () => ({ qa: [], facts: [] }),
+    kbRemarks: async () => [],
+    kbAddRemark: async r => r,
+    kbResolveRemark: async () => ({}),
+    kbLogEnquiry: async r => r,
+    kbEnquiries: async () => [],
     adminSignOut: async () => { adminEmail = null; sessionStorage.removeItem('sac-demo-admin'); },
     adminLoadAll: async () => structuredClone(await load()),
     adminActivity: async () => [{ at: now(), actor: 'demo', action: 'Activity log is recorded in the live version' }],
