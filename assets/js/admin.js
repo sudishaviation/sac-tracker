@@ -16,11 +16,30 @@ if (DEMO) {
 }
 
 // ---------------- auth ----------------
+function showPasswordForm() {
+  $('#login').hidden = false; $('#app').hidden = true; $('#loginForm').hidden = true; $('#pwForm').hidden = false;
+}
+$('#pwForm').onsubmit = async e => {
+  e.preventDefault(); $('#pwErr').hidden = true;
+  const a = $('#pw1').value, b = $('#pw2').value;
+  if (a.length < 10 || a !== b) { $('#pwErr').textContent = a !== b ? 'The two passwords do not match.' : 'Use at least 10 characters.'; $('#pwErr').hidden = false; return; }
+  try { await api.setPassword(a); $('#pw1').value = $('#pw2').value = ''; toast('Password saved'); $('#pwForm').hidden = true; $('#loginForm').hidden = false; await start(); }
+  catch (err) { $('#pwErr').textContent = err.message; $('#pwErr').hidden = false; }
+};
+$('#forgot').onclick = async () => {
+  const email = $('#email').value.trim();
+  if (!email) { $('#loginErr').textContent = 'Type your email above first, then press Forgot password.'; $('#loginErr').hidden = false; return; }
+  try { await api.sendPasswordReset(email); $('#loginErr').className = 'notice'; $('#loginErr').textContent = 'If this email belongs to the SAC team, a reset link is on its way. Open it on this device.'; $('#loginErr').hidden = false; }
+  catch (err) { $('#loginErr').textContent = err.message; $('#loginErr').hidden = false; }
+};
+$('#chpw').onclick = () => showPasswordForm();
+
 async function start() {
+  if (['invite', 'recovery'].includes(api.authLinkType?.()) && await api.authReady?.()) { showPasswordForm(); return; }
   const who = await api.adminSession();
   if (!who) { $('#login').hidden = false; $('#app').hidden = true; $('#logout').hidden = true; return; }
   role = who.role || 'owner'; me = who.email;
-  $('#who').textContent = `${who.email} · ${isOwner() ? 'Owner' : 'Counsellor'}`; $('#logout').hidden = false; $('#login').hidden = true; $('#app').hidden = false;
+  $('#who').textContent = `${who.email} · ${isOwner() ? 'Owner' : 'Counsellor'}`; $('#logout').hidden = false; $('#chpw').hidden = DEMO; $('#login').hidden = true; $('#app').hidden = false;
   $$('#nav [data-owner]').forEach(b => { b.hidden = !isOwner(); });
   await reload();
   if (isOwner()) { try { const n = await api.adminPurge(); if (n) toast(`${n} withdrawn record(s) older than 12 months deleted`); } catch { /* ignore */ } }
