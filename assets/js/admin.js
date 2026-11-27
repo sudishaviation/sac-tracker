@@ -1,5 +1,6 @@
 import { getApi, DEMO } from './api.js';
 import { renderKnowledge } from './kb.js';
+import { renderTeam } from './team.js';
 import {
   $, $$, h, esc, money, fmtDate, fmtDateTime, toast, copy, basePath, parentLink, buildPayload, adminAlerts,
   STAGES, STATUS_LABEL, STUDENT_STATUS, LEAD_SOURCES, WITHDRAW_REASONS, DOCTOR_GROUPS, currentStage, nextAction,
@@ -440,6 +441,7 @@ const SETTINGS = {
   fees: { label: 'Fees', pk: 'key', cols: [['label', 'Fee'], ['amount', 'Amount', 'num'], ['currency', 'Cur.'], ['payee', 'Paid to'], ['refundable', 'Refundable', 'bool'], ['note', 'Note']] },
   doctors: { label: 'CAAN doctors', pk: 'id', add: true, cols: [['grp', 'Group', 'grp'], ['name', 'Name'], ['address', 'Address'], ['phone', 'Phone'], ['email', 'Email'], ['active', 'Show', 'bool']] },
   settings: { label: 'General', pk: 'key', cols: [['label', 'Setting', 'ro'], ['value', 'Value']] },
+  team: { label: 'Team', custom: true },
   guide: { label: 'HAA guide', custom: true },
 };
 let setTab = 'intakes';
@@ -449,7 +451,7 @@ function renderSettings(v) {
   v.append(c);
   $('.subtabs', c).onclick = e => { const b = e.target.closest('[data-st]'); if (b) { setTab = b.dataset.st; render(); } };
   const cfg = SETTINGS[setTab];
-  if (cfg.custom) { $('.tablewrap', c)?.remove(); renderGuide(v); return; }
+  if (cfg.custom) { $('.tablewrap', c)?.remove(); if (setTab === 'team') renderTeam(v, api, me); else renderGuide(v); return; }
   const tbl = h(`<table class="tbl"><thead><tr>${cfg.cols.map(x => `<th>${x[1]}</th>`).join('')}<th></th></tr></thead><tbody></tbody></table>`);
   $('.tablewrap', c).append(tbl);
   const cell = (col, val) => {

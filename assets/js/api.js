@@ -59,6 +59,12 @@ async function supabaseApi() {
     setPassword: async password => { const { error } = await sb.auth.updateUser({ password }); if (error) throw friendly(error); history.replaceState(null, '', location.pathname); },
     sendPasswordReset: async email => { const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname }); if (error) throw friendly(error); },
     kbTidioExport: () => q(sb.from('kb_tidio_export').select('question,answer')),
+    teamAdmin: async (action, payload = {}) => {
+      const { data, error } = await sb.functions.invoke('team-admin', { body: { action, ...payload } });
+      if (error) { let m = error.message; try { m = (await error.context.json()).error || m; } catch { /* keep */ } throw new Error(m); }
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
     adminLoadAll: async (role = 'owner') => {
       if (role === 'owner') {
         const tables = ['students', 'student_steps', 'step_templates', 'programs', 'intakes', 'fees', 'doctors', 'settings', 'commissions'];
@@ -150,6 +156,7 @@ function demoApi() {
     adminSession: async () => (adminEmail ? { email: adminEmail, role: 'owner' } : null),
     kbLoad: async () => ({ qa: [], facts: [] }),
     kbTidioExport: async () => [],
+    teamAdmin: async action => (action === 'list' ? { team: [{ user_id: 'demo', email: 'demo@sac', full_name: 'Demo Owner', role: 'owner', active: true }] } : { ok: true }),
     authLinkType: () => null,
     setPassword: async () => {},
     sendPasswordReset: async () => {},
