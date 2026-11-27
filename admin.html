@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>SAC Admin · Admission Tracker</title>
+<title>SAC Team · Admission Tracker</title>
 <link rel="icon" href="assets/img/sac-plane-red.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -12,14 +12,14 @@
 </head>
 <body>
 <header class="topbar">
-  <div class="logos"><img class="sac" src="assets/img/sac-logo-white.png" alt="SAC"><span class="sep"></span><span style="font-weight:700;letter-spacing:.04em">Admission Tracker · Admin</span></div>
+  <div class="logos"><img class="sac" src="assets/img/sac-logo-white.png" alt="SAC"><span class="sep"></span><span style="font-weight:700;letter-spacing:.04em">Admission Tracker · Team</span></div>
   <div class="spacer"></div><span class="who" id="who"></span><button id="logout" hidden>Log out</button>
 </header>
 <div id="demo"></div>
 <div id="login" class="login-hero" hidden>
   <form class="login-card" id="loginForm">
     <div class="brand"><img src="assets/img/sac-logo-red.png" alt="SAC"></div>
-    <h1>SAC staff login</h1>
+    <h1>SAC team login</h1>
     <div class="field"><label for="email">Email</label><input id="email" type="email" required autocomplete="username"></div>
     <div class="field"><label for="pw">Password</label><input id="pw" type="password" required autocomplete="current-password"></div>
     <div id="loginErr" class="notice err" hidden></div>
@@ -29,9 +29,10 @@
 <main id="app" class="wrap wide" hidden>
   <nav class="tabs" id="nav">
     <button data-view="students" class="active">Students</button>
-    <button data-view="add">+ Add student</button>
+    <button data-view="knowledge">Knowledge Hub</button>
+    <button data-view="add" data-owner>+ Add student</button>
     <button data-view="reminders">Reminders</button>
-    <button data-view="settings">Settings</button>
+    <button data-view="settings" data-owner>Settings</button>
   </nav>
   <section id="view"></section>
 </main>
