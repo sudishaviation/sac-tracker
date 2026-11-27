@@ -1,6 +1,4 @@
 import { getApi, DEMO } from './api.js';
-import { renderKnowledge } from './kb.js';
-import { renderTeam } from './team.js';
 import {
   $, $$, h, esc, money, fmtDate, fmtDateTime, toast, copy, basePath, parentLink, buildPayload, adminAlerts,
   STAGES, STATUS_LABEL, STUDENT_STATUS, LEAD_SOURCES, WITHDRAW_REASONS, DOCTOR_GROUPS, currentStage, nextAction,
@@ -8,8 +6,7 @@ import {
 } from './core.js';
 
 const api = await getApi();
-let db = null, view = 'students', role = 'owner', me = '';
-const isOwner = () => role === 'owner';
+let db = null, view = 'students';
 
 if (DEMO) {
   $('#demo').append(h(`<div class="demo-bar">Demo mode · sample data in this browser only. Any email/password logs in. <button id="resetDemo">Reset demo</button></div>`));
@@ -17,33 +14,12 @@ if (DEMO) {
 }
 
 // ---------------- auth ----------------
-function showPasswordForm() {
-  $('#login').hidden = false; $('#app').hidden = true; $('#loginForm').hidden = true; $('#pwForm').hidden = false;
-}
-$('#pwForm').onsubmit = async e => {
-  e.preventDefault(); $('#pwErr').hidden = true;
-  const a = $('#pw1').value, b = $('#pw2').value;
-  if (a.length < 10 || a !== b) { $('#pwErr').textContent = a !== b ? 'The two passwords do not match.' : 'Use at least 10 characters.'; $('#pwErr').hidden = false; return; }
-  try { await api.setPassword(a); $('#pw1').value = $('#pw2').value = ''; toast('Password saved'); $('#pwForm').hidden = true; $('#loginForm').hidden = false; await start(); }
-  catch (err) { $('#pwErr').textContent = err.message; $('#pwErr').hidden = false; }
-};
-$('#forgot').onclick = async () => {
-  const email = $('#email').value.trim();
-  if (!email) { $('#loginErr').textContent = 'Type your email above first, then press Forgot password.'; $('#loginErr').hidden = false; return; }
-  try { await api.sendPasswordReset(email); $('#loginErr').className = 'notice'; $('#loginErr').textContent = 'If this email belongs to the SAC team, a reset link is on its way. Open it on this device.'; $('#loginErr').hidden = false; }
-  catch (err) { $('#loginErr').textContent = err.message; $('#loginErr').hidden = false; }
-};
-$('#chpw').onclick = () => showPasswordForm();
-
 async function start() {
-  if (['invite', 'recovery'].includes(api.authLinkType?.()) && await api.authReady?.()) { showPasswordForm(); return; }
   const who = await api.adminSession();
   if (!who) { $('#login').hidden = false; $('#app').hidden = true; $('#logout').hidden = true; return; }
-  role = who.role || 'owner'; me = who.email;
-  $('#who').textContent = `${who.email} · ${isOwner() ? 'Owner' : 'Counsellor'}`; $('#logout').hidden = false; $('#chpw').hidden = DEMO; $('#login').hidden = true; $('#app').hidden = false;
-  $$('#nav [data-owner]').forEach(b => { b.hidden = !isOwner(); });
+  $('#who').textContent = who; $('#logout').hidden = false; $('#login').hidden = true; $('#app').hidden = false;
   await reload();
-  if (isOwner()) { try { const n = await api.adminPurge(); if (n) toast(`${n} withdrawn record(s) older than 12 months deleted`); } catch { /* ignore */ } }
+  try { const n = await api.adminPurge(); if (n) toast(`${n} withdrawn record(s) older than 12 months deleted`); } catch { /* ignore */ }
 }
 $('#loginForm').onsubmit = async e => {
   e.preventDefault(); $('#loginErr').hidden = true;
@@ -53,7 +29,7 @@ $('#loginForm').onsubmit = async e => {
 $('#logout').onclick = async () => { await api.adminSignOut(); location.reload(); };
 $('#nav').onclick = e => { const b = e.target.closest('[data-view]'); if (!b) return; view = b.dataset.view; render(); };
 
-async function reload() { db = await api.adminLoadAll(role); render(); }
+async function reload() { db = await api.adminLoadAll(); render(); }
 
 // ---------------- helpers ----------------
 const P = sid => buildPayload(db, sid, 'admin');
@@ -78,9 +54,7 @@ function welcomeMessage(s, pin, ptoken) {
 // ---------------- views ----------------
 function render() {
   $$('#nav button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
-  const v = $('#view'); v.innerHTML = ''; v.onclick = null;
-  if (!isOwner() && ['add', 'settings'].includes(view)) view = 'students';
-  if (view === 'knowledge') { renderKnowledge(v, api, { role, email: me, students: db.students }); return; }
+  const v = $('#view'); v.innerHTML = '';
   ({ students: renderStudentsHome, add: renderAdd, reminders: renderReminders, settings: renderSettings })[view](v);
 }
 
@@ -165,7 +139,7 @@ function renderDash(v) {
     <div class="kpi ${pend ? 'alert' : ''}"><label>To verify</label><b>${pend}</b></div>
     <div class="kpi ${alerts.length - pend ? 'alert' : ''}"><label>Alerts</label><b>${alerts.length - pend}</b></div>
     <div class="kpi"><label>Visas granted</label><b>${granted.length}</b></div>
-    ${isOwner() ? `<div class="kpi"><label>Commission (USD)</label><b style="font-size:18px">${money(rec, '')} <span class="muted small">/ ${money(exp, '')} expected</span></b></div>` : ''}
+    <div class="kpi"><label>Commission (USD)</label><b style="font-size:18px">${money(rec, '')} <span class="muted small">/ ${money(exp, '')} expected</span></b></div>
   </div>`));
   const g = h(`<div class="grid2"><div></div><div></div></div>`); v.append(g);
 
@@ -196,7 +170,7 @@ function renderStudentsHome(v) {
   v.append(attentionCard());
   const list = h('<div></div>'); v.append(list);
   renderStudents(list);
-  const st = h(`<details class="card" style="margin-top:14px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Stats — pipeline, lead sources${isOwner() ? ', commission' : ''}</summary><div style="margin-top:12px"></div></details>`);
+  const st = h('<details class="card" style="margin-top:14px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Stats — pipeline, lead sources, commission</summary><div style="margin-top:12px"></div></details>');
   v.append(st); renderDash($('div', st));
   v.onclick = e => { const o = e.target.closest('[data-open]'); if (o) openStudent(o.dataset.open); };
 }
@@ -307,7 +281,7 @@ async function openStudent(id) {
   const qa = h(`<div class="card"><h3>Quick actions</h3><div class="actions">
     <button class="btn navy small" data-a="pin">Reset PIN</button>
     <button class="btn ghost small" data-a="plink">Copy parent link</button>
-    ${isOwner() ? '<button class="btn ghost small" data-a="preset">Reset parent link</button>' : ''}
+    <button class="btn ghost small" data-a="preset">Reset parent link</button>
     <button class="btn ghost small" data-a="popen">Open parent view</button>
     <button class="btn ghost small" data-a="remind">Reminder email</button></div><div id="pinOut"></div>
     <p class="muted small">Agreements: ${s.ack_terms_at ? `accepted ${fmtDateTime(s.ack_terms_at)}` : s.consent_recorded_on ? `consent recorded offline on ${fmtDate(s.consent_recorded_on)} · student still ticks at first login` : '<b>not yet accepted</b> (student accepts at first login)'}</p></div>`);
@@ -359,7 +333,7 @@ async function openStudent(id) {
     <div class="field"><label>Quarter</label><input name="quarter" placeholder="e.g. 2027-Q1" value="${esc(com.quarter || '')}"></div>
     <div class="field"><label>Note</label><input name="note" value="${esc(com.note || '')}"></div>
     </div><button class="btn small ghost" type="submit">Save commission</button></form></div>`);
-  if (isOwner()) body.append(cm);
+  body.append(cm);
   $('form', cm).onsubmit = async e => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.target));
@@ -441,7 +415,6 @@ const SETTINGS = {
   fees: { label: 'Fees', pk: 'key', cols: [['label', 'Fee'], ['amount', 'Amount', 'num'], ['currency', 'Cur.'], ['payee', 'Paid to'], ['refundable', 'Refundable', 'bool'], ['note', 'Note']] },
   doctors: { label: 'CAAN doctors', pk: 'id', add: true, cols: [['grp', 'Group', 'grp'], ['name', 'Name'], ['address', 'Address'], ['phone', 'Phone'], ['email', 'Email'], ['active', 'Show', 'bool']] },
   settings: { label: 'General', pk: 'key', cols: [['label', 'Setting', 'ro'], ['value', 'Value']] },
-  team: { label: 'Team', custom: true },
   guide: { label: 'HAA guide', custom: true },
 };
 let setTab = 'intakes';
@@ -451,7 +424,7 @@ function renderSettings(v) {
   v.append(c);
   $('.subtabs', c).onclick = e => { const b = e.target.closest('[data-st]'); if (b) { setTab = b.dataset.st; render(); } };
   const cfg = SETTINGS[setTab];
-  if (cfg.custom) { $('.tablewrap', c)?.remove(); if (setTab === 'team') renderTeam(v, api, me); else renderGuide(v); return; }
+  if (cfg.custom) { $('.tablewrap', c)?.remove(); renderGuide(v); return; }
   const tbl = h(`<table class="tbl"><thead><tr>${cfg.cols.map(x => `<th>${x[1]}</th>`).join('')}<th></th></tr></thead><tbody></tbody></table>`);
   $('.tablewrap', c).append(tbl);
   const cell = (col, val) => {

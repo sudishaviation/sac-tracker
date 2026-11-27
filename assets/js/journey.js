@@ -24,6 +24,7 @@ export function renderPortal(root, p, opts = {}) {
 
   root.innerHTML = '';
   if (opts.banner) root.append(h(opts.banner));
+  if ((p.settings || {}).notice) root.append(h(`<div class="notice warn">🛠 ${esc(p.settings.notice)}</div>`));
   root.append(h(`<section class="pass" aria-label="Your boarding pass">
     <div class="pass-main">
       <div class="pass-head"><span>BOARDING PASS</span><span>SAC <i>×</i> HAA</span></div>
