@@ -53,6 +53,12 @@ async function supabaseApi() {
       try { const role = await rpc('my_role'); return role ? { email: data.session.user.email, role } : null; } catch { return null; }
     },
     adminSignOut: () => sb.auth.signOut(),
+    // Invitation / password-reset links land here with a token in the URL.
+    authLinkType: () => { const p = new URLSearchParams(location.hash.slice(1)); return p.get('type'); },
+    authReady: async () => { const { data } = await sb.auth.getSession(); return !!data.session; },
+    setPassword: async password => { const { error } = await sb.auth.updateUser({ password }); if (error) throw friendly(error); history.replaceState(null, '', location.pathname); },
+    sendPasswordReset: async email => { const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname }); if (error) throw friendly(error); },
+    kbTidioExport: () => q(sb.from('kb_tidio_export').select('question,answer')),
     adminLoadAll: async (role = 'owner') => {
       if (role === 'owner') {
         const tables = ['students', 'student_steps', 'step_templates', 'programs', 'intakes', 'fees', 'doctors', 'settings', 'commissions'];
@@ -143,6 +149,10 @@ function demoApi() {
     adminSignIn: async email => { adminEmail = email || 'demo@sac'; sessionStorage.setItem('sac-demo-admin', adminEmail); },
     adminSession: async () => (adminEmail ? { email: adminEmail, role: 'owner' } : null),
     kbLoad: async () => ({ qa: [], facts: [] }),
+    kbTidioExport: async () => [],
+    authLinkType: () => null,
+    setPassword: async () => {},
+    sendPasswordReset: async () => {},
     kbRemarks: async () => [],
     kbAddRemark: async r => r,
     kbResolveRemark: async () => ({}),

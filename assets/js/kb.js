@@ -37,7 +37,7 @@ export async function renderKnowledge(v, api, ctx) {
         <button data-k="log">Log an enquiry</button>
         <button data-k="remarks">Remarks</button>
         <button data-k="enquiries">Enquiry log</button>
-        ${owner ? '<button data-k="facts">Facts</button>' : ''}
+        ${owner ? '<button data-k="facts">Facts</button><button data-k="export">Export</button>' : ''}
       </div></div>
       <p class="muted small" style="margin:6px 0 0">Answer callers from here, not from memory. <b>Verified</b> answers are approved by Suraj. <b>Not yet verified</b> answers may be out of date — check with Suraj before quoting them. Spot a mistake? Press <b>Remark</b>.</p></div>`));
   const body = h('<div></div>'); v.append(body);
@@ -51,7 +51,7 @@ export async function renderKnowledge(v, api, ctx) {
   function draw() {
     $$('#kbTabs button', v).forEach(b => b.classList.toggle('active', b.dataset.k === state.tab));
     body.innerHTML = '';
-    ({ answers: drawAnswers, log: () => drawLog(), remarks: drawRemarks, enquiries: drawEnquiries, facts: drawFacts })[state.tab]();
+    ({ answers: drawAnswers, log: () => drawLog(), remarks: drawRemarks, enquiries: drawEnquiries, facts: drawFacts, export: drawExport })[state.tab]();
   }
 
   // ---------- answers ----------
@@ -212,6 +212,24 @@ export async function renderKnowledge(v, api, ctx) {
     const val = f => f.value_text ?? (f.value_num != null ? `${f.value_num}${f.unit ? ' ' + f.unit : ''}` : '—');
     body.append(h(`<div class="card"><h3>Facts used inside answers</h3><p class="muted small">Change a fact once (ask Claude) and every answer that uses it updates and is flagged for review.</p>
       <div class="tablewrap"><table class="tbl"><thead><tr><th>Fact</th><th>Value</th><th>Source</th><th>Checked</th><th>Public</th></tr></thead><tbody>${rows.map(f => `<tr><td>${esc(f.label)}<br><small class="mono muted">${esc(f.key)}</small></td><td><b>${esc(val(f))}</b></td><td class="small">${esc(f.source_ref || '')}</td><td class="small">${esc(f.verified_on || '—')}</td><td>${f.is_public ? 'Yes' : 'No'}</td></tr>`).join('')}</tbody></table></div></div>`));
+  }
+
+  // ---------- export (owner) ----------
+  function drawExport() {
+    const c = h(`<div class="card" style="max-width:760px"><h3>Export for Tidio</h3>
+      <p class="small">Downloads every answer published to Tidio (approved or draft, not under review, not retired) as a Question/Answer CSV — the format Tidio's <b>Upload CSV</b> accepts. Do this after each batch of changes, then replace the old CSV items in Tidio.</p>
+      <div class="actions"><button class="btn" data-x>Download Tidio CSV</button></div><div class="muted small" id="xout"></div></div>`);
+    body.append(c);
+    $('[data-x]', c).onclick = async () => {
+      try {
+        const rows = await api.kbTidioExport();
+        const cell = x => `"${String(x ?? '').replace(/"/g, '""')}"`;
+        const csv = '\ufeff' + [['Question', 'Answer'], ...rows.map(r => [r.question, r.answer])].map(r => r.map(cell).join(',')).join('\r\n');
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+        a.download = `SAC_Tidio_QA_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+        $('#xout', c).textContent = `${rows.length} answers exported.`;
+      } catch (err) { toast(err.message, 'err'); }
+    };
   }
 
   draw();
