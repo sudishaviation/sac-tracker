@@ -147,6 +147,7 @@ export function studentWarnings(p) {
     const limit = new Date(toDate(p.intake.start_month)); limit.setMonth(limit.getMonth() + 6);
     if (toDate(exp) < limit) w.push({ kind: 'warn', text: `Your passport expires on ${fmtDate(exp)}. Talk to SAC about renewing it before your visa interview.` });
   }
+  if (keyed.med_caan?.data?.result === 'Fail') w.push({ kind: 'warn', text: 'Your medical result is “Fail”. Please talk to SAC about your next steps.' });
   return w;
 }
 
@@ -157,6 +158,7 @@ export function adminAlerts(stu, p) {
   if (['withdrawn', 'completed', 'studying'].includes(stu.status)) return out;
   p.steps.filter(s => s.status === 'pending').forEach(s => out.push({ level: 'verify', text: `Verify: ${s.title}`, step: s.key }));
   p.steps.forEach(s => { const e = expectation(s, keyed); if (e?.overdue) out.push({ level: 'red', text: `Overdue: ${s.title} (expected by ${fmtDate(e.to)})`, step: s.key }); });
+  if (keyed.med_caan?.data?.result === 'Fail') out.push({ level: 'red', text: 'Medical failed — contact student', step: 'med_caan' });
   const idle = daysBetween(stu.last_activity_at, new Date());
   if (stu.status === 'active' && idle >= 14) out.push({ level: 'amber', text: `No movement for ${idle} days` });
   const visaDone = keyed.visa_result && isComplete(keyed.visa_result);
